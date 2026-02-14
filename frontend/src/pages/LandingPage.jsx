@@ -58,7 +58,7 @@ const LandingPage = () => {
                     <div className="max-w-4xl mx-auto">
                         <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 mb-6 tracking-tight">
                             Elevate Your Team's <br />
-                            <span className="text-blue-600">LMS</span>
+                            <span className="text-blue-600">LEARNING MANAGEMENT SYSTEM</span>
                         </h1>
                         <p className="text-xl text-slate-600 mb-10 leading-relaxed max-w-2xl mx-auto">
                             A streamlined, professional learning management system designed for enterprise teams.
