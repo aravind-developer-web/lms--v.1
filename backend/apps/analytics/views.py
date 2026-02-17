@@ -1,16 +1,76 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
-from django.db.models import Sum, Avg, Q
+from django.db.models import Sum, Avg, Q, F
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import timedelta
-from .models import VideoProgress, LearningSession
+from .models import VideoProgress, LearningSession, VideoEngagement, LearningHealth
 from apps.quiz.models import QuizAttempt
 from apps.assignments.models import Assignment
 from apps.modules.models import Module
+from .services import EngagementService, HealthService
+import logging
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+class EngagementHeartbeatView(APIView):
+    """
+    Receives periodic pings from frontend to track 'True Engagement'.
+    POST /analytics/engagement/heartbeat/
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            module_id = request.data.get('module_id')
+            data = request.data # {active_watch_time, total_duration, seek_count...}
+            
+            if not module_id:
+                return Response({'error': 'Module ID required'}, status=400)
+                
+            module = Module.objects.get(id=module_id)
+            
+            # Service Update
+            engagement = EngagementService.update_engagement(
+                user=request.user,
+                module=module,
+                data=data
+            )
+            
+            return Response({
+                'status': 'updated',
+                'score': engagement.engagement_score
+            })
+            
+        except Exception as e:
+            logger.error(f"Heartbeat Error: {e}")
+            return Response({'error': str(e)}, status=500)
+
+class HealthMetricsView(APIView):
+    """
+    GET /analytics/health/
+    Returns current health score for dashboard.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Get latest or calculate
+            health = HealthService.calculate_health(request.user)
+            
+            return Response({
+                'score': health.learning_health_score,
+                'status': health.status,
+                'breakdown': {
+                    'engagement': health.avg_engagement * 100,
+                    'quiz': health.avg_quiz_score,
+                    'assignment': health.avg_assignment_score
+                }
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
 class ManagerLearnerProgressView(APIView):
     """
@@ -207,6 +267,12 @@ class VideoProgressUpdateView(APIView):
 
         return Response({'status': 'updated', 'percent': percent})
 
+import logging
+from django.db import transaction
+from django.db.models import F
+
+logger = logging.getLogger(__name__)
+
 class SessionPingView(APIView):
     """
     Heartbeat Endpoint: increments active learning time.
@@ -217,15 +283,131 @@ class SessionPingView(APIView):
         module_id = request.data.get('module_id')
         if not module_id:
             return Response({'error': 'Missing module_id'}, status=400)
-            
-        session, created = LearningSession.objects.get_or_create(
-            user=request.user,
-            module_id=module_id,
-            status='active',
-            defaults={'total_seconds': 0}
-        )
-        
-        session.total_seconds += 10 # Assume 10s ping
-        session.save()
-        
-        return Response({'status': 'pong', 'total': session.total_seconds})
+
+        # Validate Module Existence
+        if not Module.objects.filter(id=module_id).exists():
+            return Response({'error': 'Module not found'}, status=404)
+
+        try:
+            with transaction.atomic():
+                # 1. Fetch active sessions (handle duplicates)
+                sessions = LearningSession.objects.filter(
+                    user=request.user,
+                    module_id=module_id,
+                    status='active'
+                ).select_for_update().order_by('-last_ping_at')
+
+                if sessions.exists():
+                    session = sessions.first()
+                    
+                    # Self-Healing: Close old duplicate sessions
+                    if sessions.count() > 1:
+                        logger.warning(f"Duplicate sessions found for user {request.user.id}, module {module_id}. Closing {sessions.count() - 1} duplicates.")
+                        for dupe in sessions[1:]:
+                            dupe.status = 'completed'
+                            dupe.save()
+
+                    # Atomic Increment
+                    session.total_seconds = F('total_seconds') + 10
+                    session.save()
+                    
+                    # Refresh to get updated value for response
+                    session.refresh_from_db()
+                else:
+                    # Create new session if none exists
+                    session = LearningSession.objects.create(
+                        user=request.user,
+                        module_id=module_id,
+                        status='active',
+                        total_seconds=0
+                    )
+                
+                return Response({'status': 'pong', 'total': session.total_seconds})
+
+        except Exception as e:
+            logger.error(f"CRITICAL: Session Ping Failed for User {request.user.id}: {str(e)}", exc_info=True)
+            return Response(
+                {'error': 'Internal Server Error', 'details': str(e)}, 
+                status=500
+            )
+
+from config.celery import app as celery_app
+from django.conf import settings
+import redis
+import requests
+from apps.utils.supabase_storage import SupabaseStorage
+
+class PipelineHealthView(APIView):
+    """
+    GET /analytics/system/health/
+    Checks status of all pipeline components.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.role in ['admin', 'manager', 'oversight']:
+             return Response({'error': 'Unauthorized'}, status=403)
+
+        health_status = {
+            "redis": "unknown",
+            "celery": "unknown",
+            "supabase": "unknown",
+            "assemblyai": "unknown",
+            "gemini": "unknown"
+        }
+
+        # 1. Check Redis
+        try:
+            r = redis.from_url(settings.CELERY_BROKER_URL)
+            r.ping()
+            health_status['redis'] = 'connected'
+        except Exception as e:
+            health_status['redis'] = f'disconnected: {str(e)}'
+
+        # 2. Check Celery
+        try:
+            if settings.CELERY_TASK_ALWAYS_EAGER:
+                 health_status['celery'] = 'eager_mode (active)'
+            else:
+                inspector = celery_app.control.inspect()
+                # Check if we can reach any worker
+                stats = inspector.stats()
+                if stats:
+                    health_status['celery'] = f'active ({len(stats)} nodes)'
+                else:
+                    health_status['celery'] = 'inactive (no workers found)'
+        except Exception as e:
+            health_status['celery'] = f'error: {str(e)}'
+
+        # 3. Check Supabase
+        try:
+            storage = SupabaseStorage()
+            buckets = storage.client.storage.list_buckets()
+            if buckets is not None:
+                health_status['supabase'] = 'working'
+            else:
+                health_status['supabase'] = 'error (no response)'
+        except Exception as e:
+             health_status['supabase'] = f'failing: {str(e)}'
+
+        # 4. Check AssemblyAI (Simple Auth Check)
+        try:
+            headers = {"authorization": settings.ASSEMBLYAI_API_KEY}
+            resp = requests.get("https://api.assemblyai.com/v2/transcript?limit=1", headers=headers, timeout=5)
+            if resp.status_code == 200:
+                health_status['assemblyai'] = 'reachable'
+            else:
+                health_status['assemblyai'] = f'error: {resp.status_code}'
+        except Exception as e:
+            health_status['assemblyai'] = f'unreachable: {str(e)}'
+
+        # 5. Check Gemini
+        try:
+            if settings.GOOGLE_GEMINI_API_KEY:
+                 health_status['gemini'] = 'configured'
+            else:
+                 health_status['gemini'] = 'missing_key'
+        except:
+             health_status['gemini'] = 'error'
+
+        return Response(health_status)

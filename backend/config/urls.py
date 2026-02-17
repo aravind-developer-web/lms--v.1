@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/notes/', include('apps.notes.urls')),
     path('api/progress/', include('apps.progress.urls')),
     path('api/analytics/', include('apps.analytics.urls')),
+    path('api/ai/', include('apps.ai_engine.urls')),
 ]

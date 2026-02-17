@@ -17,9 +17,12 @@ class QuestionSerializer(serializers.ModelSerializer):
 class QuizSerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
 
+    module_title = serializers.ReadOnlyField(source='module.title')
+    module_week = serializers.ReadOnlyField(source='module.week')
+
     class Meta:
         model = Quiz
-        fields = ('id', 'title', 'passing_score', 'questions', 'module')
+        fields = ('id', 'title', 'passing_score', 'questions', 'module', 'module_title', 'module_week')
 
 class QuizAttemptSerializer(serializers.ModelSerializer):
     class Meta:

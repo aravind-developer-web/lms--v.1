@@ -1,0 +1,159 @@
+LIGHTWEIGHT LEARNING TRACKER (LMS v1.0)
+REQUIREMENTS & ARCHITECTURE DOCUMENT
+================================================================================
+
+Version: 1.0
+Date: February 14, 2026
+Status: Released (v1.0-enterprise-stable)
+
+________________________________________________________________________________
+
+1. PROJECT OVERVIEW
+
+The Lightweight Learning Tracker is a simple, fast, and efficient web-based 
+platform designed for small-to-medium teams (5-20 members) to manage learning 
+activities in a structured and transparent way. It helps centralize training 
+modules, track each learner's progress, validate understanding through quizzes, 
+and support personal note-taking--all within a clean interface.
+
+The system is built using a modern and lightweight architecture approach, 
+focusing on modular design, smooth user experience, and scalable deployment.
+
+CORE PURPOSE:
+To provide a streamlined and effective learning management workflow without the 
+complexity of traditional LMS tools, enabling teams to learn, track, and 
+improve efficiently.
+
+________________________________________________________________________________
+
+2. OBJECTIVES
+
+* Centralize Learning Content: Provide one place where all videos, articles, 
+  and documents are organized and easy to access.
+* Track Learner Progress: Let admins see each learner's status in real-time 
+  (Not Started, In Progress, Completed).
+* Validate Learning: Use short quizzes to confirm whether learners understood 
+  the material.
+* Simple, Distraction-Free Interface: Ensure the platform is clean, easy to use, 
+  and focused only on learning.
+* Support Note-Taking: Allow learners to write personal notes while studying to 
+  improve understanding and retention.
+
+________________________________________________________________________________
+
+3. USER ROLES
+
+3.1 ADMIN (MANAGER)
+Definition: The Admin manages all learning activities. They create training 
+modules, assign them to team members, and track overall progress.
+
+* Responsibilities: Create/update modules, assign to learners, monitor results, 
+  identify stuck learners.
+* Needs: Simple dashboard, clear visibility of progress, automated tracking.
+
+3.2 LEARNER (TEAM MEMBER)
+Definition: The Learner consumes training content, completes quizzes, and 
+takes personal notes.
+
+* Responsibilities: View modules, study content, complete quizzes, maintain notes.
+* Needs: Clean dashboard, distraction-free player, instant feedback.
+
+________________________________________________________________________________
+
+4. SYSTEM ARCHITECTURE
+
+We utilize the C4 Model to visualize the architecture.
+
+4.1 LEVEL 1: SYSTEM CONTEXT
+Describes how Users interact with the LMS and external systems.
+
+[Learner] --(Views modules, takes quizzes)--> [Lightweight LMS]
+[Manager] --(Creates content, tracks progress)--> [Lightweight LMS]
+[Lightweight LMS] --(Sends email)--> [Email System]
+
+4.2 LEVEL 2: CONTAINER DIAGRAM
+Shows the separately deployable containers.
+
+[User] --(HTTPS)--> [Single Page Application (React + Vite)]
+[SPA] --(JSON/HTTPS)--> [API Application (Django REST Framework)]
+[SPA] --(Embeds)--> [YouTube (Video Host)]
+[API] --(SQL)--> [Database (Supabase PostgreSQL)]
+
+________________________________________________________________________________
+
+5. CORE SYSTEM MODULES
+
+5.1 AUTHENTICATION & USER MANAGEMENT
+* Tech: JWT Authentication (Django SimpleJWT).
+* Features: Login, Signup, Role Management (Admin/Learner), Profile Updates.
+
+5.2 ADMIN WORKSPACE (CONTENT MANAGEMENT)
+* Module Creation: Title, Description, Duration, Resources (YouTube URLs).
+* Assignments: Bulk or individual assignment with optional due dates.
+* Quiz Builder: Multiple-choice questions, passing score configuration.
+
+5.3 LEARNER EXPERIENCE (LEARNING FLOW)
+* Dashboard: Kanban-style progress (To Do -> In Progress -> Completed).
+* Learning Player:
+    - Split View: Content on left, Notes on right.
+    - Tracking: Auto-progress updates (heartbeat every 10s).
+    - Notes: Private, rich-text editor with auto-save.
+
+5.4 QUIZ & VALIDATION ENGINE
+* Logic: Block module completion until quiz is passed (default 80%).
+* Feedback: Instant scoring and result display.
+
+5.5 ANALYTICS & REPORTING (TRACKING ENGINE)
+* Aggregated Score Formula: (0.4 * Video) + (0.3 * Quiz) + (0.3 * Assignment)
+* Manager Dashboard: Real-time grid view of learner status, "Last Active" 
+  timestamps, and detailed drill-downs.
+
+________________________________________________________________________________
+
+6. DESIGN SYSTEM & UI/UX
+
+The UI follows the "Enterprise Light" design language, focused on clarity 
+and professionalism.
+
+6.1 KEY UI PRINCIPLES
+* Simplicity: Minimal cognitive load.
+* Accessibility: WCAG 2.1 AA Compliant (High contrast, focus states).
+* Responsiveness: Mobile-first grid layouts.
+
+________________________________________________________________________________
+
+7. TECHNOLOGY STACK
+
+COMPONENT       | TECHNOLOGY              | DESCRIPTION
+----------------|-------------------------|------------------------------------
+Frontend        | React 18                | Vite, TailwindCSS, React Router
+Backend         | Django 5                | Django REST Framework, SimpleJWT
+Database        | Supabase                | Managed PostgreSQL with Realtime
+Deployment      | Docker                  | Containerized Nginx + Gunicorn
+
+________________________________________________________________________________
+
+8. NON-FUNCTIONAL REQUIREMENTS
+
+8.1 PERFORMANCE
+* API Latency: < 300ms for core endpoints.
+* Frontend: < 1.5s LCP (Largest Contentful Paint).
+* Optimization: Tree-shaking, lazy loading of heavy components.
+
+8.2 SECURITY
+* Data Protection: HTTPS verification.
+* Auth: Stateless JWT with rotation.
+* Input Validation: Django ORM sanitization to prevent SQL injection.
+
+8.3 RELIABILITY
+* Availability: 99.9% uptime target.
+* Recovery: Automated database backups.
+
+________________________________________________________________________________
+
+CONCLUSION
+
+The Lightweight Learning Tracker v1.0 delivers a focused, efficient solution 
+for team learning. By combining a modern React/Django architecture with robust 
+tracking and clean design, it ensures accountability and skill growth without 
+enterprise bloat.

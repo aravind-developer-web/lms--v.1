@@ -61,6 +61,20 @@ class AssignmentSubmitView(APIView):
 
     def post(self, request, module_id):
         """Submit assignment content"""
+        # --- SMART LOCK ENFORCEMENT ---
+        if request.user.role not in ['manager', 'admin']:
+            module = get_object_or_404(Module, id=module_id)
+            if module.has_quiz:
+                from apps.quiz.models import QuizAttempt
+                passed = QuizAttempt.objects.filter(
+                    user=request.user, 
+                    quiz__module_id=module_id, 
+                    passed=True # Using passed flag directly
+                ).exists()
+                if not passed:
+                     return Response({"detail": "Quiz not passed. Assignment locked."}, status=403)
+        # ------------------------------
+
         try:
             module = get_object_or_404(Module, id=module_id)
             content = request.data.get('content', '')

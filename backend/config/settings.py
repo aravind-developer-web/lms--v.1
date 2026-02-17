@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'apps.progress',
     'apps.notes',
     'apps.analytics',
+    'apps.ai_engine',
 ]
 
 MIDDLEWARE = [
@@ -81,19 +82,13 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DATABASE_NAME', 'lms_db'),
-        'USER': os.environ.get('DATABASE_USER', 'lms_user'),
-        'PASSWORD': os.environ.get('DATABASE_PASSWORD', 'lms_password'),
-        'HOST': os.environ.get('DATABASE_HOST', 'db'),
-        'PORT': os.environ.get('DATABASE_PORT', '5432'),
+        'NAME': os.environ.get('DATABASE_NAME'),
+        'USER': os.environ.get('DATABASE_USER'),
+        'PASSWORD': os.environ.get('DATABASE_PASSWORD'),
+        'HOST': os.environ.get('DATABASE_HOST'),
+        'PORT': os.environ.get('DATABASE_PORT'),
     }
 }
-# Fallback to SQLite if no DB host specified (Local Dev without Docker)
-if not os.environ.get('DATABASE_HOST'):
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -146,7 +141,7 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
@@ -185,3 +180,21 @@ LOGGING = {
     },
 }
 
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# PRODUCTION SETTINGS:
+# We want async execution. 'Eager' means synchronous (blocking).
+# Set to False to use the actual Celery Worker + Redis.
+CELERY_TASK_ALWAYS_EAGER = False 
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# AI Keys
+ASSEMBLYAI_API_KEY = os.environ.get('ASSEMBLYAI_API_KEY')
+GOOGLE_GEMINI_API_KEY = os.environ.get('GOOGLE_GEMINI_API_KEY')

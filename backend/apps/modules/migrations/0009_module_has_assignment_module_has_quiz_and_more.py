@@ -12,16 +12,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name='module',
-            name='has_assignment',
-            field=models.BooleanField(default=False),
-        ),
-        migrations.AddField(
-            model_name='module',
-            name='has_quiz',
-            field=models.BooleanField(default=False),
-        ),
-        migrations.AddField(
-            model_name='module',
             name='priority',
             field=models.PositiveIntegerField(default=0),
         ),

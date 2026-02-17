@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { useToast } from '../hooks/useToast';
+import Toast from '../components/Toast';
 
 const ManagerDashboard = () => {
+    const { toast, showToast, hideToast } = useToast();
     const [learners, setLearners] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedLearner, setSelectedLearner] = useState(null);
@@ -12,6 +15,8 @@ const ManagerDashboard = () => {
     // Stream Upload State
     const [streamTitle, setStreamTitle] = useState('');
     const [streamUrl, setStreamUrl] = useState('');
+    const [videoFile, setVideoFile] = useState(null);
+    const [selectedWeek, setSelectedWeek] = useState(4); // Default to Week 4
     const [uploading, setUploading] = useState(false);
 
     useEffect(() => {
@@ -39,21 +44,51 @@ const ManagerDashboard = () => {
 
     const handleStreamUpload = async (e) => {
         e.preventDefault();
-        if (!streamTitle || !streamUrl) return;
+        if (!streamTitle || !selectedWeek) return;
+
+        if (!videoFile && !streamUrl) {
+            showToast("Please provide a Video File or URL", "error");
+            return;
+        }
 
         setUploading(true);
         try {
-            await api.post('/modules/stream/upload/', {
-                title: streamTitle,
-                url: streamUrl
-            });
-            alert("Stream Broadcasted Successfully. Curriculum Recalculated.");
+            let response;
+            if (videoFile) {
+                // AI Pipeline Upload
+                const formData = new FormData();
+                formData.append('title', streamTitle);
+                formData.append('week', selectedWeek);
+                formData.append('video_file', videoFile);
+
+                response = await api.post('/ai/upload/', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                showToast(`AI Pipeline Initiated: ${response.data.status || 'Processing...'}`, "success");
+            } else {
+                // Legacy URL Upload
+                response = await api.post('/modules/stream/upload/', {
+                    title: streamTitle,
+                    url: streamUrl,
+                    week: selectedWeek
+                });
+
+                if (response.data.status && response.data.status.includes("AI Offline")) {
+                    showToast(response.data.status, "warning");
+                } else {
+                    showToast(response.data.status, "success");
+                }
+            }
+
             setStreamTitle('');
             setStreamUrl('');
+            setVideoFile(null);
+            setSelectedWeek(4);
             fetchData(); // Refresh to see impact
         } catch (error) {
             console.error("Upload Failed", error);
-            alert("Failed to broadcast stream.");
+            if (error.code === 'ERR_CANCELED') return; // Ignore aborted
+            showToast("Failed to broadcast stream. Please try again.", "error");
         } finally {
             setUploading(false);
         }
@@ -202,12 +237,25 @@ const ManagerDashboard = () => {
                 <div className="space-y-6">
                     <div className="bg-gray-900 rounded-[32px] p-8 text-white shadow-2xl relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-8 opacity-10">
-                            <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" /></svg>
+                            <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" /></svg>
                         </div>
                         <h3 className="text-xl font-bold mb-2 relative z-10">Broadcast Stream</h3>
                         <p className="text-gray-400 text-xs mb-6 relative z-10">Upload a learning vector. System will push to all learner nodes and recalculate global progress.</p>
 
                         <form onSubmit={handleStreamUpload} className="space-y-4 relative z-10">
+                            <div>
+                                <label htmlFor="week-select" className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Target Week</label>
+                                <select
+                                    id="week-select"
+                                    value={selectedWeek}
+                                    onChange={e => setSelectedWeek(Number(e.target.value))}
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                    {[1, 2, 3, 4].map(w => (
+                                        <option key={w} value={w}>Week {w}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div>
                                 <label htmlFor="stream-title" className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Stream Title</label>
                                 <input
@@ -220,7 +268,7 @@ const ManagerDashboard = () => {
                                 />
                             </div>
                             <div>
-                                <label htmlFor="stream-url" className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Source URL</label>
+                                <label htmlFor="stream-url" className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Source URL (Optional)</label>
                                 <input
                                     id="stream-url"
                                     type="text"
@@ -228,6 +276,28 @@ const ManagerDashboard = () => {
                                     placeholder="https://..."
                                     value={streamUrl}
                                     onChange={e => setStreamUrl(e.target.value)}
+                                    disabled={!!videoFile}
+                                />
+                            </div>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-700"></div>
+                                </div>
+                                <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                                    <span className="px-2 bg-gray-900 text-gray-500">OR UPLOAD FILE</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label htmlFor="video-file" className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Video File (AI Processing)</label>
+                                <input
+                                    id="video-file"
+                                    type="file"
+                                    accept="video/*"
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-sm text-white focus:ring-2 focus:ring-blue-500 outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                                    onChange={e => setVideoFile(e.target.files[0])}
+                                    disabled={!!streamUrl}
                                 />
                             </div>
                             <button
@@ -361,6 +431,7 @@ const ManagerDashboard = () => {
                 </div>
             )}
             {drawerOpen && <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-40 transition-opacity" onClick={() => setDrawerOpen(false)} />}
+            {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
         </div>
     );
 };

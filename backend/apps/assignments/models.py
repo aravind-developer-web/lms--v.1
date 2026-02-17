@@ -26,3 +26,11 @@ class Assignment(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.module.title}"
 
+class AssignmentQuestion(models.Model):
+    module = models.ForeignKey(Module, related_name='assignment_questions', on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    
+    def __str__(self):
+        return f"{self.module.title} - Question"
+

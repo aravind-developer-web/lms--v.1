@@ -24,6 +24,21 @@ class QuizSubmitView(APIView):
 
     def post(self, request, module_id):
         quiz = get_object_or_404(Quiz, module_id=module_id)
+        
+        # --- SMART LOCK ENFORCEMENT ---
+        # We use the ModuleSerializer logic but manual check for performance/specificity
+        # Or better: check VideoEngagement directly
+        from apps.analytics.models import VideoEngagement
+        if request.user.role not in ['manager', 'admin']:
+            try:
+                engagement = VideoEngagement.objects.get(user=request.user, module_id=module_id)
+                # Strict check: Must have 80% score
+                if engagement.engagement_score < 0.8:
+                    return Response({"detail": "Engagement too low. Please watch the video properly."}, status=403)
+            except VideoEngagement.DoesNotExist:
+                return Response({"detail": "Video not detected. Please watch the video first."}, status=403)
+        # ------------------------------
+
         user_answers = request.data.get('answers', {})
         score = 0
         total_questions = quiz.questions.count()
