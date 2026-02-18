@@ -155,6 +155,91 @@ class ManagerLearnerProgressView(APIView):
 
         return Response(data)
 
+from apps.learner_progress.models import LearnerModuleProgress
+
+class ManagerWeekProgressView(APIView):
+    """
+    Control Tower 2.0: Dynamic Week-wise Aggregation.
+    Formula: 
+    - video_progress = (completed_videos_in_week / total_videos_in_week) * 100
+    - quiz_progress = (passed_quizzes_in_week / total_quizzes_in_week) * 100
+    - week_progress = (video_progress + quiz_progress) / 2
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ['manager', 'admin', 'oversight']:
+            return Response({'error': 'Unauthorized'}, status=403)
+
+        learners = User.objects.filter(role='learner').order_by('id')
+        active_modules = Module.objects.filter(is_active=True)
+        
+        # Pre-group modules by week for efficiency
+        weeks_modules = {w: active_modules.filter(week=w) for w in range(1, 5)}
+        weeks_total = {w: weeks_modules[w].count() for w in range(1, 5)}
+        
+        data = []
+        for learner in learners:
+            learner_data = {
+                'id': learner.id,
+                'name': learner.username,
+                'email': learner.email,
+            }
+            
+            weeks_scores = []
+            for w in range(1, 5):
+                total_in_week = weeks_total[w]
+                if total_in_week == 0:
+                    learner_data[f'week{w}'] = {'progress': 0, 'color': 'red'}
+                    weeks_scores.append(0)
+                    continue
+                
+                # 1. Video Progress
+                # A video is "completed" if LearnerModuleProgress.is_video_completed is True
+                completed_videos = LearnerModuleProgress.objects.filter(
+                    user=learner,
+                    module__week=w,
+                    module__is_active=True,
+                    is_video_completed=True
+                ).count()
+                video_progress = (completed_videos / total_in_week) * 100
+                
+                # 2. Quiz Progress
+                # A quiz is "passed" if score >= 80 for any attempt on a module in that week
+                # Count modules in the week that have a passed attempt
+                passed_quizzes = 0
+                for mod in weeks_modules[w]:
+                    if QuizAttempt.objects.filter(user=learner, quiz__module=mod, score__gte=80).exists():
+                        passed_quizzes += 1
+                
+                quiz_progress = (passed_quizzes / total_in_week) * 100
+                
+                # 3. Final Week Progress
+                week_progress = (video_progress + quiz_progress) / 2
+                
+                # Color logic
+                if week_progress >= 70: color = 'green'
+                elif week_progress >= 40: color = 'orange'
+                else: color = 'red'
+                
+                learner_data[f'week{w}'] = {
+                    'progress': round(week_progress, 1),
+                    'color': color
+                }
+                weeks_scores.append(week_progress)
+            
+            # Overall score = average of all 4 weeks
+            overall = sum(weeks_scores) / 4
+            learner_data['overall'] = round(overall, 1)
+            data.append(learner_data)
+            
+        # Ranking Logic: Sort by overall desc
+        data.sort(key=lambda x: x['overall'], reverse=True)
+        for i, item in enumerate(data):
+            item['rank'] = i + 1
+            
+        return Response(data)
+
 class ManagerLearnerDetailsView(APIView):
     """
     Drill-down API: Returns detailed analytics for a specific learner.

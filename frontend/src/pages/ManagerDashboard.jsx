@@ -3,6 +3,62 @@ import api from '../services/api';
 import { useToast } from '../hooks/useToast';
 import Toast from '../components/Toast';
 
+const CircularProgress = ({ progress, color }) => {
+    const size = 44;
+    const strokeWidth = 3.5;
+    const center = size / 2;
+    const radius = center - strokeWidth;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (progress / 100) * circumference;
+
+    const colors = {
+        green: { stroke: '#22c55e', bg: '#f0fdf4', text: '#166534' },
+        orange: { stroke: '#f97316', bg: '#fff7ed', text: '#9a3412' },
+        red: { stroke: '#ef4444', bg: '#fef2f2', text: '#991b1b' }
+    };
+
+    const activeColor = colors[color] || colors.red;
+
+    return (
+        <div className="relative flex items-center justify-center group/circle" style={{ width: size, height: size }}>
+            <svg width={size} height={size} className="transform -rotate-90">
+                {/* Background Circle */}
+                <circle
+                    cx={center}
+                    cy={center}
+                    r={radius}
+                    stroke="#f3f4f6"
+                    strokeWidth={strokeWidth}
+                    fill="none"
+                />
+                {/* Progress Circle */}
+                <circle
+                    cx={center}
+                    cy={center}
+                    r={radius}
+                    stroke={activeColor.stroke}
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                    strokeLinecap="round"
+                    fill="none"
+                    style={{ transition: 'stroke-dashoffset 1s ease-out' }}
+                />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-[10px] font-black leading-none" style={{ color: activeColor.text }}>
+                    {Math.round(progress)}
+                </span>
+                <span className="text-[6px] font-bold uppercase tracking-tighter opacity-40 -mt-0.5" style={{ color: activeColor.text }}>%</span>
+            </div>
+            {/* Tooltip on hover */}
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-[9px] font-bold rounded opacity-0 group-hover/circle:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none shadow-xl">
+                {progress}% Complete
+            </div>
+        </div>
+    );
+};
+
 const ManagerDashboard = () => {
     const { toast, showToast, hideToast } = useToast();
     const [learners, setLearners] = useState([]);
@@ -27,12 +83,13 @@ const ManagerDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const res = await api.get('/analytics/manager/learner-progress/');
+            const res = await api.get('/analytics/manager/week-progress/');
             setLearners(res.data);
 
             const total = res.data.length;
-            const active = res.data.filter(l => l.status === 'active').length;
-            const avgProgress = res.data.reduce((acc, l) => acc + (l.progress || 0), 0) / (total || 1);
+            // For stats, we can still use some heuristic of 'active' if overall > 0 or just show global average
+            const active = res.data.filter(l => l.overall > 0).length;
+            const avgProgress = res.data.reduce((acc, l) => acc + (l.overall || 0), 0) / (total || 1);
 
             setStats({ total, active, avgProgress: Math.round(avgProgress) });
         } catch (error) {
@@ -121,16 +178,25 @@ const ManagerDashboard = () => {
                 <div className="space-y-2">
                     <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-green-500/50 shadow-sm" />
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">System Operational</span>
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Intelligence System Active</span>
                     </div>
                     <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Control Tower</h1>
-                    <p className="text-gray-500 font-medium text-sm">Deep-dive telemetry and granular learner tracking.</p>
+                    <p className="text-gray-500 font-medium text-sm">Week-wise progression tracking and deep-dive telemetry.</p>
                 </div>
                 <div className="flex gap-4">
                     <div className="px-5 py-3 bg-gray-900 text-white rounded-2xl shadow-intense flex flex-col items-start gap-0.5">
                         <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Global Sync</span>
-                        <span className="text-xl font-bold">{stats.avgProgress}% <span className="text-[10px] text-green-400">Efficiency</span></span>
+                        <span className="text-xl font-bold">{stats.avgProgress}% <span className="text-[10px] text-green-400">Mastery</span></span>
                     </div>
+                    <button
+                        onClick={() => window.location.href = '/manager/content-edit'}
+                        className="btn-ghost bg-gray-900 border border-gray-900 text-white focus:ring-4 focus:ring-gray-200 focus:outline-none rounded-2xl px-5 py-3 font-bold text-sm hover:bg-gray-800 transition-all flex items-center gap-2 shadow-lg"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Edit Content
+                    </button>
                     <button
                         onClick={fetchData}
                         aria-label="Refresh Telemetry Grid"
@@ -149,12 +215,10 @@ const ManagerDashboard = () => {
                             <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-50">
                                 <th className="px-6 py-4">Rank</th>
                                 <th className="px-6 py-4">Learner</th>
-                                <th className="px-6 py-4">Progress</th>
-                                <th className="px-6 py-4 text-center">Time</th>
-                                <th className="px-6 py-4 text-center">Video</th>
-                                <th className="px-6 py-4 text-center">Quiz</th>
-                                <th className="px-6 py-4 text-center">Assn</th>
-                                <th className="px-6 py-4 text-right">Status</th>
+                                <th className="px-6 py-4 text-center">Week 1</th>
+                                <th className="px-6 py-4 text-center">Week 2</th>
+                                <th className="px-6 py-4 text-center">Week 3</th>
+                                <th className="px-6 py-4 text-center">Week 4</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -177,55 +241,24 @@ const ManagerDashboard = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="flex flex-col gap-1.5 w-24">
-                                            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                                                <div
-                                                    className={`h-full transition-all duration-1000 ${learner.progress >= 75 ? 'bg-green-500' :
-                                                        learner.progress >= 40 ? 'bg-blue-600' : 'bg-gray-400'
-                                                        }`}
-                                                    style={{ width: `${learner.progress}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-[10px] font-bold text-gray-600">{learner.progress}%</span>
+                                        <div className="flex justify-center">
+                                            <CircularProgress progress={learner.week1.progress} color={learner.week1.color} />
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-center text-xs font-bold text-gray-700">{learner.time_invested}</td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className="px-2 py-1 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-100">
-                                            {learner.video_score || 0}%
-                                        </span>
+                                    <td className="px-6 py-4">
+                                        <div className="flex justify-center">
+                                            <CircularProgress progress={learner.week2.progress} color={learner.week2.color} />
+                                        </div>
                                     </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold border border-indigo-100">
-                                            {learner.quiz_score || 0}%
-                                        </span>
+                                    <td className="px-6 py-4">
+                                        <div className="flex justify-center">
+                                            <CircularProgress progress={learner.week3.progress} color={learner.week3.color} />
+                                        </div>
                                     </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <span className="px-2 py-1 rounded-md bg-orange-50 text-orange-700 text-[10px] font-bold border border-orange-100">
-                                            {learner.assignment_score || 0}%
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        {learner.status === 'active' && (
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-green-100 text-green-700 border border-green-200">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-2 animate-pulse" /> Active
-                                            </span>
-                                        )}
-                                        {learner.status === 'slow' && (
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-orange-100 text-orange-700 border border-orange-200">
-                                                Slow
-                                            </span>
-                                        )}
-                                        {learner.status === 'stuck' && (
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-700 border border-red-200">
-                                                Stuck
-                                            </span>
-                                        )}
-                                        {learner.status === 'offline' && (
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-gray-100 text-gray-500 border border-gray-200">
-                                                Offline
-                                            </span>
-                                        )}
+                                    <td className="px-6 py-4">
+                                        <div className="flex justify-center">
+                                            <CircularProgress progress={learner.week4.progress} color={learner.week4.color} />
+                                        </div>
                                     </td>
                                 </tr>
                             ))}

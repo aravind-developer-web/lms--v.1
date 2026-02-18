@@ -36,6 +36,7 @@ class Module(models.Model):
     priority = models.PositiveIntegerField(default=0)
     has_assignment = models.BooleanField(default=False)
     has_quiz = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):

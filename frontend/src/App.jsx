@@ -14,6 +14,7 @@ import StudentQuizList from './pages/StudentQuizList';
 import StudentAssignmentList from './pages/StudentAssignmentList';
 import Profile from './pages/Profile';
 import BroadcastPlayer from './pages/BroadcastPlayer';
+import ContentEdit from './pages/ContentEdit';
 import NotFound from './pages/NotFound';
 import Layout from './components/layout/Layout';
 
@@ -45,6 +46,7 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/dashboard" element={<DashboardRouter />} />
             <Route path="/manager" element={<DashboardRouter />} />
+            <Route path="/manager/content-edit" element={<ContentEdit />} />
             <Route path="/modules/:id" element={<ModulePlayer />} />
             <Route path="/modules/:id/quiz" element={<QuizPage />} />
             <Route path="/modules/:id/assignment" element={<AssignmentPage />} />

@@ -6,10 +6,12 @@ from .views import (
     SessionPingView,
     EngagementHeartbeatView,
     HealthMetricsView,
-    PipelineHealthView
+    PipelineHealthView,
+    ManagerWeekProgressView
 )
 
 urlpatterns = [
+    path('manager/week-progress/', ManagerWeekProgressView.as_view(), name='manager_week_progress'),
     path('manager/learner-progress/', ManagerLearnerProgressView.as_view(), name='manager_learner_progress'),
     path('manager/<int:user_id>/learner_details/', ManagerLearnerDetailsView.as_view(), name='manager_learner_details'),
     path('progress/video-update/', VideoProgressUpdateView.as_view(), name='video_progress_update'),

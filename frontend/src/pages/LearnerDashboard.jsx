@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from '../hooks/useToast';
 import api from '../services/api';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -72,23 +73,37 @@ const LearnerDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const [modulesRes, progressRes, healthRes] = await Promise.all([
-                api.get('/modules/'),
-                api.get('/modules/my-progress/').catch(() => ({ data: [] })),
-                api.get('/analytics/health/').catch(() => ({ data: { score: 0, status: 'needs_attention', breakdown: {} } }))
-            ]);
+            // New Aggregated Endpoint
+            const response = await api.get('/learner-progress/dashboard/');
+            const data = response.data;
 
-            setModules(modulesRes.data.sort((a, b) => a.week - b.week || a.order - b.order));
+            setModules(data.modules);
 
+            // Map progress for compatibility with existing render logic
             const progressMap = {};
-            if (progressRes.data && Array.isArray(progressRes.data)) {
-                progressRes.data.forEach(p => progressMap[p.module] = p);
-            }
+            data.modules.forEach(m => {
+                progressMap[m.id] = {
+                    status: m.status,
+                    completion_percent: m.video_percent, // Mapping for circular progress
+                    video_percent: m.video_percent,
+                    quiz_percent: m.quiz_percent,
+                    assignment_percent: m.assignment_percent
+                };
+            });
             setProgress(progressMap);
-            setHealth(healthRes.data);
+
+            // Map Health
+            setHealth({
+                score: data.health_score,
+                status: data.health_status,
+                breakdown: {
+                    engagement: data.health_score // Simplified for now
+                }
+            });
 
         } catch (error) {
             console.error("Dashboard Sync Failed", error);
+            showToast("Failed to load dashboard data", "error");
         } finally {
             setLoading(false);
         }

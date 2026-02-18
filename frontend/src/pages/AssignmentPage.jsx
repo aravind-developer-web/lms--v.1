@@ -40,6 +40,12 @@ const AssignmentPage = () => {
                 content: submissionContent
             });
             setSuccess(true);
+
+            // Push Progress Update
+            await api.post('/learner-progress/assignment/', {
+                module_id: id,
+                submitted: true
+            }).catch(err => console.error("Progress push failed", err));
         } catch (error) {
             console.error("Submission failed", error);
         } finally {

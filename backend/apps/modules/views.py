@@ -188,3 +188,45 @@ class ResourceCreateView(generics.CreateAPIView):
             serializer.save(module_id=module_id)
         else:
             raise permissions.PermissionDenied("Unauthorized")
+
+class ManagerModuleView(APIView):
+    """
+    GET /api/manager/modules/
+    Returns all modules grouped by week for management.
+    Format: {"Week 1": [...], "Week 2": [...]}
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ['manager', 'admin']:
+            return Response({"error": "Unauthorized"}, status=403)
+            
+        data = {}
+        for week in range(1, 5):
+            modules = Module.objects.filter(week=week).values('id', 'title', 'week', 'is_active')
+            data[f"Week {week}"] = list(modules)
+        return Response(data)
+
+class ModuleRemoveView(APIView):
+    """
+    PATCH /api/manager/modules/<id>/remove/
+    Body: {"is_active": false}
+    Soft deletes a module.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        if request.user.role not in ['manager', 'admin']:
+            return Response({"error": "Unauthorized"}, status=403)
+            
+        try:
+            module = Module.objects.get(id=pk)
+            is_active = request.data.get('is_active')
+            
+            if is_active is not None:
+                module.is_active = is_active
+                module.save()
+                return Response({"message": f"Module active status updated to {is_active}"}, status=200)
+            return Response({"error": "is_active field required"}, status=400)
+        except Module.DoesNotExist:
+            return Response({"error": "Module not found"}, status=404)

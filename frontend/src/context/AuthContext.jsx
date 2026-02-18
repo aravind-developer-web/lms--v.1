@@ -36,17 +36,24 @@ export const AuthProvider = ({ children }) => {
     };
 
     const login = async (username, password) => {
-        const response = await api.post('/auth/login/', { username, password });
-        const { access, refresh, role, username: apiUsername } = response.data; // MyTokenObtainPair returns extra data if customized
+        console.log("LOGIN ATTEMPT:", { username, password });
+        try {
+            const response = await api.post('/auth/login/', { username, password });
+            console.log("LOGIN SUCCESS:", response.data);
+            const { access, refresh, role, username: apiUsername } = response.data; // MyTokenObtainPair returns extra data if customized
 
-        // Decoding token is better but for now rely on response or /me
-        localStorage.setItem('access_token', access);
-        localStorage.setItem('refresh_token', refresh);
+            // Decoding token is better but for now rely on response or /me
+            localStorage.setItem('access_token', access);
+            localStorage.setItem('refresh_token', refresh);
 
-        // Fetch user details immediately
-        const userResponse = await api.get('/auth/me/');
-        setUser(userResponse.data);
-        return userResponse.data;
+            // Fetch user details immediately
+            const userResponse = await api.get('/auth/me/');
+            setUser(userResponse.data);
+            return userResponse.data;
+        } catch (error) {
+            console.error("LOGIN FAILED:", error.response?.data || error);
+            throw error;
+        }
     };
 
     const register = async (userData) => {

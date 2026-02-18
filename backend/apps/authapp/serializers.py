@@ -37,13 +37,14 @@ class RegisterSerializer(serializers.ModelSerializer):
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         try:
-            import os
-            from django.conf import settings
-            with open('db_check.log', 'a') as f:
-                f.write(f"DB Path: {settings.DATABASES['default']['NAME']}\n")
-        except:
-            pass
-        return super().validate(attrs)
+            print(f"Auth Attempt for: {attrs.get('username')}")
+            # The super().validate() method calls authenticate()
+            data = super().validate(attrs)
+            print("Auth Success!")
+            return data
+        except Exception as e:
+            print(f"Auth Failed: {str(e)}")
+            raise e
 
     @classmethod
     def get_token(cls, user):
