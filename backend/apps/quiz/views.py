@@ -18,6 +18,7 @@ class QuizDetailView(generics.RetrieveAPIView):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'module_id'
+    lookup_url_kwarg = 'module_id'
 
 class QuizSubmitView(APIView):
     permission_classes = [permissions.IsAuthenticated]

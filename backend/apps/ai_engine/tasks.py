@@ -131,10 +131,19 @@ def process_module_content(self, module_id):
                 assignment_data = ai_data.get('assignment')
                 
                 if assignment_data and isinstance(assignment_data, dict):
-                    # Save to Module's assignment_prompt field (Frontend uses this)
+                    # Save to Module's assignment_prompt field (Frontend fallback)
                     module.assignment_prompt = assignment_data.get('description', '')
                     module.has_assignment = True
-                    logger.info("   Assignment Prompt Saved to Module")
+                    
+                    # Create detailed AssignmentQuestion (Primary Source for frontend)
+                    AssignmentQuestion.objects.update_or_create(
+                        module=module,
+                        defaults={
+                            'title': assignment_data.get('title', f"Assignment: {module.title}"),
+                            'description': assignment_data.get('description', '')
+                        }
+                    )
+                    logger.info("   Assignment Prompt and Question Saved")
                 else:
                     logger.warning("   Assignment data missing or invalid")
 

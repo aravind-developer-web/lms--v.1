@@ -41,9 +41,29 @@ const ModulePlayer = () => {
     // Adapter: VideoEngine emits seconds, UI needs percentage
     const handleProgress = (currentTime) => {
         if (duration > 0) {
-            setVideoProgress((currentTime / duration) * 100);
+            const pct = (currentTime / duration) * 100;
+            setVideoProgress(pct);
         }
     };
+
+    // Heartbeat: Send progress every 5s if changed > 2%
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (duration > 0 && videoProgress > 0) {
+                const lastSent = parseFloat(sessionStorage.getItem(`progress_${id}`) || '0');
+                if (videoProgress - lastSent >= 2 || videoProgress >= 95) {
+                    api.post('/learner-progress/video/', {
+                        module_id: id,
+                        progress_percent: videoProgress
+                    }).then(() => {
+                        sessionStorage.setItem(`progress_${id}`, videoProgress);
+                        if (videoProgress >= 95) showToast("Progress Saved: Completed!", "success");
+                    }).catch(err => console.error("Heartbeat failed", err));
+                }
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [id, duration, videoProgress]);
 
     const handleDuration = (d) => {
         setDuration(d);

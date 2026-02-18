@@ -42,6 +42,15 @@ const QuizPage = () => {
             setSubmitting(true);
             const response = await api.post(`/quiz/${id}/submit/`, { answers });
             setResult(response.data);
+
+            // Push Progress Update
+            if (response.data) {
+                await api.post('/learner-progress/quiz/', {
+                    module_id: id,
+                    score_percent: response.data.score,
+                    passed: response.data.passed
+                }).catch(err => console.error("Progress push failed", err));
+            }
         } catch (error) {
             console.error("Failed to submit quiz", error);
         } finally {
@@ -104,8 +113,8 @@ const QuizPage = () => {
                                     key={option.id}
                                     onClick={() => handleOptionSelect(q.id, option.id)}
                                     className={`flex items-center p-4 rounded border transition-all text-left ${answers[q.id] === option.id
-                                            ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-600'
-                                            : 'bg-white border-slate-200 hover:bg-slate-50'
+                                        ? 'bg-blue-50 border-blue-600 ring-1 ring-blue-600'
+                                        : 'bg-white border-slate-200 hover:bg-slate-50'
                                         }`}
                                 >
                                     <div className={`w-5 h-5 rounded-full border mr-4 flex items-center justify-center ${answers[q.id] === option.id ? 'bg-blue-600 border-blue-600' : 'border-slate-300'

@@ -129,14 +129,14 @@ const Register = () => {
                                 onClick={() => setFormData({ ...formData, role: 'learner' })}
                                 className={`py-3.5 rounded-lg font-bold border transition-all text-sm ${formData.role === 'learner' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-200'}`}
                             >
-                                Associate
+                                LEARNER
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setFormData({ ...formData, role: 'manager' })}
                                 className={`py-3.5 rounded-lg font-bold border transition-all text-sm ${formData.role === 'manager' ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-900'}`}
                             >
-                                Oversight
+                                MANAGER
                             </button>
                         </div>
                     </div>

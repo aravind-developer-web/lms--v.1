@@ -11,6 +11,22 @@ class RegisterView(generics.CreateAPIView):
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
 
+    def post(self, request, *args, **kwargs):
+        with open('auth_debug.log', 'a') as f:
+            f.write(f"\\n--- NEW LOGIN ATTEMPT ---\\n")
+            f.write(f"Headers: {request.headers}\\n")
+            f.write(f"Data: {request.data}\\n")
+            
+        try:
+            response = super().post(request, *args, **kwargs)
+            with open('auth_debug.log', 'a') as f:
+                f.write(f"Result: SUCCESS (200)\\n")
+            return response
+        except Exception as e:
+            with open('auth_debug.log', 'a') as f:
+                f.write(f"Result: FAILED ({str(e)})\\n")
+            raise e
+
 class UserDetailView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
